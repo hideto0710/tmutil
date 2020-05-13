@@ -6,6 +6,26 @@ on:
       - '*'
 
 jobs:
+  pre:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+      - name: output
+        run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
+      - uses: actions/upload-artifact@v1
+        with:
+          name: release_url
+          path: release_url.txt
+
   release:
     name: Release for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -25,20 +45,19 @@ jobs:
           go-version: 1.14
       - name: build
         run: go build -a -o torchstand main.go
-      - uses: actions/create-release@v1
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          name: release_url
+      - name: get
+        id: get_upload_url
+        run: |
+          value=`cat release_url/release_url.txt`
+          echo ::set-output name=upload_url::$value
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.get_upload_url.outputs.upload_url }}
           asset_path: ./torchstand
           asset_name: ${{ matrix.asset }}
           asset_content_type: application/octet-stream
