@@ -21,7 +21,7 @@ import (
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/deislabs/oras/pkg/oras"
 	"github.com/gosuri/uitable"
-	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"io"
 )
 
@@ -54,13 +54,25 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 	if err := store.SaveIndex(); err != nil {
 		return err
 	}
-	var contentDigest digest.Digest
+
+	var pytorchModelDesc ocispec.Descriptor
+	var contentDesc ocispec.Descriptor
 	for _, layer := range layers {
-		if layer.MediaType == TorchServeModelContentLayerMediaType {
-			contentDigest = layer.Digest
+		switch layer.MediaType {
+		case PyTorchModelMediaType:
+			pytorchModelDesc = layer
+		case TorchServeModelContentLayerMediaType:
+			contentDesc = layer
+		default:
+			return fmt.Errorf("unsupported mediaType %s", layer.MediaType)
 		}
 	}
-	info, err := store.Info(ctx, contentDigest)
+
+	pytorchModelInfo, err := store.Info(ctx, pytorchModelDesc.Digest)
+	if err != nil {
+		return err
+	}
+	contentInfo, err := store.Info(ctx, contentDesc.Digest)
 	if err != nil {
 		return err
 	}
@@ -68,8 +80,8 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 	table := uitable.New()
 	table.Wrap = true
 	table.AddRow("Ref:", ref)
-	table.AddRow("Digest:", info.Digest)
-	table.AddRow("Size:", byteCountBinary(info.Size))
+	table.AddRow("Digest:", desc.Digest)
+	table.AddRow("Size:", byteCountBinary(pytorchModelInfo.Size+contentInfo.Size))
 	table.AddRow()
 	_, err = writer.Write(table.Bytes())
 	return nil

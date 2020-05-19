@@ -22,33 +22,39 @@ import (
 
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/deislabs/oras/pkg/content"
-	"github.com/hideto0710/torchstand/pkg/model"
 	"go.uber.org/zap"
 )
+
+var cacheDir string
 
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
+	tearDown()
 	os.Exit(code)
 }
 
 func setup() {
 	logger, _ := zap.NewDevelopment()
 	zap.ReplaceGlobals(logger)
+	cacheDir = "./cache-" + randomString(6)
+}
+
+func tearDown() {
+	os.RemoveAll(cacheDir)
 }
 
 func TestImport_Run(t *testing.T) {
 	cfg := new(Configuration)
-	store, _ := content.NewOCIStore("./cache")
+	store, _ := content.NewOCIStore(cacheDir)
 	cfg.OCIStore = store
 	cfg.Resolver = docker.NewResolver(docker.ResolverOptions{})
 	instance := NewImport(cfg)
 
 	t.Run("ok", func(t *testing.T) {
-		body := []byte("Hello World!\n")
-		ref := "localhost:5000/hello-artifact:v1"
-		m := &model.Model{ModelName: "hello"}
-		if err := instance.Run(ref, body, m, os.Stdout); err != nil {
+		file := "./testdata/densenet161.mar"
+		ref := "localhost:5000/hello-densenet161:v1"
+		if err := instance.Run(ref, file, os.Stdout); err != nil {
 			t.Error(err)
 		}
 	})

@@ -25,17 +25,17 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-playground/validator/v10"
 	"github.com/hideto0710/torchstand/pkg/action"
-	"github.com/hideto0710/torchstand/pkg/model"
+	"github.com/hideto0710/torchstand/pkg/types"
 	"github.com/spf13/cobra"
 )
 
-func newCmdArchive(cfg *action.Configuration) *cobra.Command {
+func newCmdBuild(cfg *action.Configuration) *cobra.Command {
 	var file string
 	opts := &action.ArchiveOpts{}
 
 	cmd := &cobra.Command{
-		Use:   "archive",
-		Short: "Archive a model",
+		Use:   "build",
+		Short: "Build a model archive for torchstand",
 		Long:  ``,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var content []byte
@@ -50,23 +50,28 @@ func newCmdArchive(cfg *action.Configuration) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			m := &model.Model{}
+
+			m := &action.TorchServeModelfile{}
 			err = yaml.Unmarshal(content, &m)
 			if err != nil {
 				return err
 			}
-			validate.RegisterStructValidation(modelNameValidation, model.Model{})
+
+			// validation
+			validate.RegisterStructValidation(modelNameValidation, types.Model{})
 			if err := validate.Struct(m); err != nil {
 				// TODO: stdout validation error description.
 				return err
 			}
+
+			// defaulting
 			if m.Runtime == "" {
 				m.Runtime = "python"
 			}
 			if opts.Tag == "" {
 				opts.Tag = fmt.Sprintf("%s:latest", m.ModelName)
 			}
-			return action.NewArchive(cfg).Run(m, opts, cmd.OutOrStdout())
+			return action.NewBuild(cfg).Run(m, opts, cmd.OutOrStdout())
 		},
 	}
 
@@ -77,7 +82,7 @@ func newCmdArchive(cfg *action.Configuration) *cobra.Command {
 }
 
 func modelNameValidation(sl validator.StructLevel) {
-	m := sl.Current().Interface().(model.Model)
+	m := sl.Current().Interface().(action.TorchServeModelfile)
 	matched, err := regexp.Match(`^[A-Za-z0-9][A-Za-z0-9_\-.]*$`, []byte(m.ModelName))
 	if err != nil || !matched {
 		sl.ReportError(m.ModelName, "modelName", "ModelName", "", "model name must be ^[A-Za-z0-9][A-Za-z0-9_\\-.]*$")

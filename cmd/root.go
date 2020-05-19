@@ -68,7 +68,7 @@ func newCmdRoot(cfg *action.Configuration) *cobra.Command {
 		newCmdImport(cfg),
 		newCmdRun(cfg),
 		newCmdRemoveModel(cfg),
-		newCmdArchive(cfg),
+		newCmdBuild(cfg),
 		newCmdTag(cfg),
 	)
 	return cmd
@@ -80,7 +80,7 @@ func Execute() {
 	torchstandPath = path.NewTorchstandPath(home)
 
 	actionConfig := new(action.Configuration)
-	store, err := content.NewOCIStore(torchstandPath.CachePath())
+	store, err := content.NewOCIStore(torchstandPath.RegistryPath())
 	checkError(err)
 	actionConfig.OCIStore = store
 
@@ -99,6 +99,7 @@ func Execute() {
 	actionConfig.Resolver = resolver
 
 	actionConfig.Path = torchstandPath
+	checkError(os.MkdirAll(actionConfig.Path.TempArchivePath(), os.ModePerm))
 
 	cmd := newCmdRoot(actionConfig)
 	err = cmd.Execute()

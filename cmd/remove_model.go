@@ -23,13 +23,12 @@ import (
 
 func newCmdRemoveModel(cfg *action.Configuration) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rmm",
+		Use:   "rmm repository[:tag]",
 		Short: "Remove model reference",
 		Long:  ``,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ref := args[0]
-			return action.NewRemoveModel(cfg).Run(ref, cmd.OutOrStdout())
+			return action.NewRemoveModel(cfg).Run(args[0], cmd.OutOrStdout())
 		},
 	}
 	return cmd

@@ -17,44 +17,19 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
-	"io/ioutil"
-
 	"github.com/hideto0710/torchstand/pkg/action"
-	"github.com/hideto0710/torchstand/pkg/model"
 	"github.com/spf13/cobra"
 )
 
 func newCmdImport(cfg *action.Configuration) *cobra.Command {
-	m := &model.Model{}
-
 	cmd := &cobra.Command{
-		Use:   "import",
+		Use:   "import file repository[:tag]",
 		Short: "Import a model from mar file",
 		Long:  ``,
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ref := args[0]
-			path := args[1]
-			var content []byte
-			var err error
-			if path == "-" {
-				buf := new(bytes.Buffer)
-				_, err = buf.ReadFrom(cmd.InOrStdin())
-				content = buf.Bytes()
-			} else {
-				content, err = ioutil.ReadFile(path)
-			}
-			if err != nil {
-				return err
-			}
-			// TODO: read manifest file inside zip
-			return action.NewImport(cfg).Run(ref, content, m, cmd.OutOrStdout())
+			return action.NewImport(cfg).Run(args[1], args[0], cmd.OutOrStdout())
 		},
 	}
-
-	cmd.Flags().StringVar(&m.ModelName, "model-name", "", "model name")
-	cmd.MarkFlagRequired("model-name")
-
 	return cmd
 }

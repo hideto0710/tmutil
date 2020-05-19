@@ -23,13 +23,12 @@ import (
 
 func newCmdPush(cfg *action.Configuration) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "push",
+		Use:   "push repository[:tag]",
 		Short: "Push a model to a registry",
 		Long:  ``,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ref := args[0]
-			return action.NewPush(cfg).Run(ref, cmd.OutOrStdout())
+			return action.NewPush(cfg).Run(args[0], cmd.OutOrStdout())
 		},
 	}
 	return cmd

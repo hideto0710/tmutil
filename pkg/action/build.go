@@ -20,7 +20,6 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"github.com/hideto0710/torchstand/pkg/model"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,21 +30,23 @@ const (
 	marInf           = "MAR-INF"
 )
 
+var marFilePath = fmt.Sprintf("%s/%s", marInf, manifestFileName)
+
 type ArchiveOpts struct {
 	Tag string
 }
 
-type Archive struct {
+type Build struct {
 	cfg *Configuration
 }
 
-func NewArchive(cfg *Configuration) *Archive {
-	return &Archive{
+func NewBuild(cfg *Configuration) *Build {
+	return &Build{
 		cfg: cfg,
 	}
 }
 
-func (a *Archive) Run(m *model.Model, opts *ArchiveOpts, writer io.Writer) error {
+func (a *Build) Run(m *TorchServeModelfile, opts *ArchiveOpts, writer io.Writer) error {
 	dir, err := ioutil.TempDir(os.TempDir(), "torchstand-*")
 	if err != nil {
 		return err
@@ -56,14 +57,15 @@ func (a *Archive) Run(m *model.Model, opts *ArchiveOpts, writer io.Writer) error
 	if err != nil {
 		return err
 	}
+	// TODO: use buffer
 	archiveFilename := fmt.Sprintf("%s.zip", dir)
 	if err := createZip(archiveFilename, func(w *zip.Writer) error {
 		for _, f := range fs {
-			if err := addFileToZip(w, f); err != nil {
+			if err := addFileToZip(w, f, ""); err != nil {
 				return err
 			}
 		}
-		f, err := w.Create(fmt.Sprintf("%s/%s", marInf, manifestFileName))
+		f, err := w.Create(marFilePath)
 		if err != nil {
 			return err
 		}
@@ -79,14 +81,10 @@ func (a *Archive) Run(m *model.Model, opts *ArchiveOpts, writer io.Writer) error
 	}); err != nil {
 		return err
 	}
-	content, err := ioutil.ReadFile(archiveFilename)
-	if err != nil {
-		return err
-	}
-	return NewImport(a.cfg).Run(opts.Tag, content, m, writer)
+	return NewImport(a.cfg).Run(opts.Tag, archiveFilename, writer)
 }
 
-func copyFiles(m *model.Model, dir string) ([]string, error) {
+func copyFiles(m *TorchServeModelfile, dir string) ([]string, error) {
 	var files []string
 	mf, err := copyFile(m.ModelFile, dir)
 	if err != nil {

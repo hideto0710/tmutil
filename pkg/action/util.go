@@ -77,8 +77,8 @@ func createZip(filename string, fn func(w *zip.Writer) error) error {
 	return fn(w)
 }
 
-func addFileToZip(w *zip.Writer, filename string) error {
-	fileToZip, err := os.Open(filename)
+func addFileToZip(w *zip.Writer, src string, dest string) error {
+	fileToZip, err := os.Open(src)
 	if err != nil {
 		return err
 	}
@@ -90,6 +90,9 @@ func addFileToZip(w *zip.Writer, filename string) error {
 	header, err := zip.FileInfoHeader(info)
 	if err != nil {
 		return err
+	}
+	if dest != "" {
+		header.Name = dest
 	}
 	header.Method = zip.Deflate
 	writer, err := w.CreateHeader(header)

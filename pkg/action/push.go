@@ -23,6 +23,7 @@ import (
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/deislabs/oras/pkg/oras"
 	"github.com/gosuri/uitable"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type Push struct {
@@ -46,9 +47,10 @@ func (p *Push) Run(argRef string, writer io.Writer) error {
 	if !ref.Exists {
 		return fmt.Errorf("model not found: %s", ref.Name)
 	}
+	content := []v1.Descriptor{ref.PyTorchModel, ref.Content}
 	// TODO: print progress.
 	fmt.Fprintf(writer, "pushing %s ...\n", ref.Name)
-	_, err = oras.Push(ctx, p.cfg.Resolver, ref.Name, store, ref.Content, oras.WithConfig(ref.Config))
+	_, err = oras.Push(ctx, p.cfg.Resolver, ref.Name, store, content, oras.WithConfig(ref.Config))
 	if err != nil {
 		return err
 	}
@@ -56,8 +58,8 @@ func (p *Push) Run(argRef string, writer io.Writer) error {
 	table := uitable.New()
 	table.Wrap = true
 	table.AddRow("Ref:", ref.Name)
-	table.AddRow("Digest:", ref.Content[0].Digest.Hex())
-	table.AddRow("Size:", byteCountBinary(ref.Content[0].Size))
+	table.AddRow("Digest:", ref.Digest.Hex())
+	table.AddRow("Size:", byteCountBinary(ref.Size))
 	table.AddRow()
 	_, err = writer.Write(table.Bytes())
 	return err

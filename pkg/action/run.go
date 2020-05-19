@@ -19,6 +19,7 @@ package action
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -65,8 +66,14 @@ func (p *Run) Run(ref string, opts *RunOpts, writer io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fullPath, err := filepath.Abs(filepath.Join(p.cfg.Path.CachePath(), "blobs", r.Digest.Algorithm().String(), r.Digest.Hex()))
+
+	dir, err := ioutil.TempDir(p.cfg.Path.TempArchivePath(), "work-*")
 	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	fullPath := fmt.Sprintf("%s/%s", dir, r.Digest.Hex())
+	if err := NewArchiver(r, p.cfg.Path.RegistryPath()).Archive(fullPath); err != nil {
 		return err
 	}
 

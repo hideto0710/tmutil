@@ -26,6 +26,14 @@ func NewTorchstandPath(home string) *TorchstandPath {
 	return &TorchstandPath{home: home}
 }
 
+func (t *TorchstandPath) RegistryPath() string {
+	return filepath.Join(t.CachePath(), "registry")
+}
+
+func (t *TorchstandPath) TempArchivePath() string {
+	return filepath.Join(t.CachePath(), "archive")
+}
+
 func (t *TorchstandPath) CachePath() string {
 	return filepath.Join(cacheHome(t.home), "torchstand")
 }

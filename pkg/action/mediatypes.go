@@ -17,12 +17,14 @@ limitations under the License.
 package action
 
 const (
+	PyTorchModelMediaType                = "application/vnd.torch.model.v1+pth"
 	TorchServeModelConfigMediaType       = "application/vnd.torch.config.v1+json"
-	TorchServeModelContentLayerMediaType = "application/zip+mar"
+	TorchServeModelContentLayerMediaType = "application/tar+gzip"
 )
 
 func KnownMediaTypes() []string {
 	return []string{
+		PyTorchModelMediaType,
 		TorchServeModelConfigMediaType,
 		TorchServeModelContentLayerMediaType,
 	}

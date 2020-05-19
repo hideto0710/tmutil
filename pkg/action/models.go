@@ -21,7 +21,7 @@ import (
 
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/gosuri/uitable"
-	"github.com/hideto0710/torchstand/pkg/model"
+	"github.com/hideto0710/torchstand/pkg/types"
 	"go.uber.org/zap"
 )
 
@@ -43,7 +43,7 @@ func (p *Models) Run(writer io.Writer) error {
 	if err := store.LoadIndex(); err != nil {
 		return err
 	}
-	var modelReferences []*model.Ref
+	var modelReferences []*types.Ref
 	for ref, desc := range store.ListReferences() {
 		if a, err := p.cfg.SummarizeModel(ctx, ref, desc); err != nil {
 			logger.Warn("invalid reference", zap.String("ref", ref), zap.String("error", err.Error()))
@@ -53,7 +53,7 @@ func (p *Models) Run(writer io.Writer) error {
 	}
 
 	table := uitable.New()
-	table.AddRow("REF", "DIGEST", "CREATED", "SIZE")
+	table.AddRow("REF", "DIGEST", "CREATED", "TOTAL")
 	table.MaxColWidth = 60
 	table.Separator = "\t\t"
 	for _, r := range modelReferences {

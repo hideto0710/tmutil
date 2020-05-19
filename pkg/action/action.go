@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/remotes"
 	orascontent "github.com/deislabs/oras/pkg/content"
-	"github.com/hideto0710/torchstand/pkg/model"
 	"github.com/hideto0710/torchstand/pkg/path"
+	"github.com/hideto0710/torchstand/pkg/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -69,7 +69,7 @@ func (cfg *Configuration) StoreBlob(ctx context.Context, name string, mediaType 
 	}, nil
 }
 
-func (cfg *Configuration) FetchReference(ctx context.Context, argRef string) (*model.Ref, error) {
+func (cfg *Configuration) FetchReference(ctx context.Context, argRef string) (*types.Ref, error) {
 	store := cfg.OCIStore
 	if err := store.LoadIndex(); err != nil {
 		return nil, err
@@ -79,21 +79,24 @@ func (cfg *Configuration) FetchReference(ctx context.Context, argRef string) (*m
 			return cfg.SummarizeModel(ctx, ref, manifestDesc)
 		}
 	}
-	return &model.Ref{
+	return &types.Ref{
 		Name:   argRef,
 		Exists: false,
 	}, nil
 }
 
-func (cfg *Configuration) SummarizeModel(ctx context.Context, ref string, manifestDesc ocispec.Descriptor) (*model.Ref, error) {
+func (cfg *Configuration) SummarizeModel(ctx context.Context, ref string, manifestDesc ocispec.Descriptor) (*types.Ref, error) {
 	store := cfg.OCIStore
-	result := &model.Ref{Name: ref}
+
+	result := &types.Ref{Name: ref}
 	result.Manifest = manifestDesc
 	result.Exists = true
+
 	reader, err := store.ReaderAt(ctx, manifestDesc)
 	if err != nil {
 		return result, err
 	}
+
 	manifestBytes := make([]byte, manifestDesc.Size)
 	_, err = reader.ReadAt(manifestBytes, 0)
 	if err != nil {
@@ -104,29 +107,46 @@ func (cfg *Configuration) SummarizeModel(ctx context.Context, ref string, manife
 		return result, err
 	}
 	result.Config = manifest.Config
+
 	numLayers := len(manifest.Layers)
-	if numLayers != 1 {
-		return result, fmt.Errorf("manifest does not contain exactly 1 layer (total: %d)", numLayers)
+	if numLayers != 2 {
+		return result, fmt.Errorf("manifest does not contain exactly 2 layers (total: %d)", numLayers)
 	}
-	var contentDesc *ocispec.Descriptor
+	var pytorchModelDesc ocispec.Descriptor
+	var contentDesc ocispec.Descriptor
 	for _, layer := range manifest.Layers {
-		if layer.MediaType == TorchServeModelContentLayerMediaType {
-			contentDesc = &layer
+		switch layer.MediaType {
+		case PyTorchModelMediaType:
+			pytorchModelDesc = layer
+		case TorchServeModelContentLayerMediaType:
+			contentDesc = layer
+		default:
+			return result, fmt.Errorf("unsupported mediaType %s", layer.MediaType)
 		}
 	}
-	if contentDesc == nil {
-		return result, fmt.Errorf("manifest does not contain a layer with mediatype %s", TorchServeModelContentLayerMediaType)
+	if pytorchModelDesc.Size == 0 {
+		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", PyTorchModelMediaType)
 	}
 	if contentDesc.Size == 0 {
 		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", TorchServeModelContentLayerMediaType)
 	}
-	result.Content = []ocispec.Descriptor{*contentDesc}
-	info, err := store.Info(ctx, contentDesc.Digest)
+
+	result.PyTorchModel = pytorchModelDesc
+	modelInfo, err := store.Info(ctx, pytorchModelDesc.Digest)
 	if err != nil {
 		return result, err
 	}
-	result.Size = info.Size
-	result.Digest = info.Digest
-	result.CreatedAt = info.CreatedAt
+	result.Content = contentDesc
+	contentInfo, err := store.Info(ctx, contentDesc.Digest)
+	if err != nil {
+		return result, err
+	}
+	manifestInfo, err := store.Info(ctx, manifestDesc.Digest)
+	if err != nil {
+		return result, err
+	}
+	result.Size = contentInfo.Size + modelInfo.Size
+	result.Digest = manifestDesc.Digest
+	result.CreatedAt = manifestInfo.CreatedAt
 	return result, nil
 }

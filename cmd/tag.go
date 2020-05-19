@@ -23,7 +23,7 @@ import (
 
 func newCmdTag(cfg *action.Configuration) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tag",
+		Use:   "tag source[:tag] target[:tag]",
 		Short: "Create a tag that refers to source model",
 		Long:  ``,
 		Args:  cobra.ExactArgs(2),

@@ -14,22 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package types
 
 import (
-	"github.com/hideto0710/torchstand/pkg/action"
-	"github.com/spf13/cobra"
+	"time"
+
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func newCmdPull(cfg *action.Configuration) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "pull repository[:tag]",
-		Short: "Pull a model from a registry",
-		Long:  ``,
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return action.NewPull(cfg).Run(args[0], cmd.OutOrStdout())
-		},
-	}
-	return cmd
+type Ref struct {
+	Name         string
+	Exists       bool
+	Manifest     ocispec.Descriptor
+	Config       ocispec.Descriptor
+	PyTorchModel ocispec.Descriptor
+	Content      ocispec.Descriptor
+	Size         int64
+	Digest       digest.Digest
+	CreatedAt    time.Time
 }

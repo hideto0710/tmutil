@@ -25,13 +25,12 @@ func newCmdRun(cfg *action.Configuration) *cobra.Command {
 	opts := &action.RunOpts{}
 
 	cmd := &cobra.Command{
-		Use:   "run",
+		Use:   "run repository[:tag]",
 		Short: "Run model server in a new container",
 		Long:  ``,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ref := args[0]
-			return action.NewRun(cfg).Run(ref, opts, cmd.OutOrStdout())
+			return action.NewRun(cfg).Run(args[0], opts, cmd.OutOrStdout())
 		},
 	}
 
