@@ -47,13 +47,8 @@ func NewArchiver(ref *torchstandTypes.Ref, registryPath string) *Archiver {
 	}
 }
 
-func (a *Archiver) Archive(dest string) error {
-	zipFile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer zipFile.Close()
-	w := zip.NewWriter(zipFile)
+func (a *Archiver) Archive(writer io.Writer) error {
+	w := zip.NewWriter(writer)
 	defer w.Close()
 
 	if err := a.copyConfig(w); err != nil {

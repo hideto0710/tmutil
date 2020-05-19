@@ -70,6 +70,7 @@ func newCmdRoot(cfg *action.Configuration) *cobra.Command {
 		newCmdRemoveModel(cfg),
 		newCmdBuild(cfg),
 		newCmdTag(cfg),
+		newCmdSave(cfg),
 	)
 	return cmd
 }

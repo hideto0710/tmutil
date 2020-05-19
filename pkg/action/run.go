@@ -78,7 +78,12 @@ func (p *Run) Run(argRef string, opts *RunOpts, writer io.Writer) error {
 	}
 	defer os.RemoveAll(dir)
 	fullPath := fmt.Sprintf("%s/%s", dir, ref.Digest.Hex())
-	if err := util.NewArchiver(ref, p.cfg.Path.RegistryPath()).Archive(fullPath); err != nil {
+	zipFile, err := os.Create(fullPath)
+	if err != nil {
+		return err
+	}
+	defer zipFile.Close()
+	if err := util.NewArchiver(ref, p.cfg.Path.RegistryPath()).Archive(zipFile); err != nil {
 		return err
 	}
 
