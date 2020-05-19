@@ -51,7 +51,7 @@ func newCmdBuild(cfg *action.Configuration) *cobra.Command {
 				return err
 			}
 
-			m := &action.TorchServeModelfile{}
+			m := &types.TorchServeModelfile{}
 			err = yaml.Unmarshal(content, &m)
 			if err != nil {
 				return err
@@ -82,7 +82,7 @@ func newCmdBuild(cfg *action.Configuration) *cobra.Command {
 }
 
 func modelNameValidation(sl validator.StructLevel) {
-	m := sl.Current().Interface().(action.TorchServeModelfile)
+	m := sl.Current().Interface().(types.TorchServeModelfile)
 	matched, err := regexp.Match(`^[A-Za-z0-9][A-Za-z0-9_\-.]*$`, []byte(m.ModelName))
 	if err != nil || !matched {
 		sl.ReportError(m.ModelName, "modelName", "ModelName", "", "model name must be ^[A-Za-z0-9][A-Za-z0-9_\\-.]*$")

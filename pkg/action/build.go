@@ -17,20 +17,13 @@ limitations under the License.
 package action
 
 import (
-	"archive/zip"
-	"encoding/json"
-	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-)
 
-const (
-	manifestFileName = "MANIFEST.json"
-	marInf           = "MAR-INF"
+	orascontext "github.com/deislabs/oras/pkg/context"
+	"github.com/gosuri/uitable"
+	"github.com/hideto0710/torchstand/pkg/types"
+	"github.com/hideto0710/torchstand/pkg/util"
 )
-
-var marFilePath = fmt.Sprintf("%s/%s", marInf, manifestFileName)
 
 type ArchiveOpts struct {
 	Tag string
@@ -46,78 +39,32 @@ func NewBuild(cfg *Configuration) *Build {
 	}
 }
 
-func (a *Build) Run(m *TorchServeModelfile, opts *ArchiveOpts, writer io.Writer) error {
-	dir, err := ioutil.TempDir(os.TempDir(), "torchstand-*")
+func (a *Build) Run(m *types.TorchServeModelfile, opts *ArchiveOpts, writer io.Writer) error {
+	ctx := orascontext.Background()
+	store := a.cfg.OCIStore
+	bb, err := util.NewBuilder(m).Build()
+
+	descs, err := storeAll(ctx, bb, m.Manifest(), a.cfg.StoreBlob)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
 
-	fs, err := copyFiles(m, dir)
-	if err != nil {
+	if err := store.LoadIndex(); err != nil {
 		return err
 	}
-	// TODO: use buffer
-	archiveFilename := fmt.Sprintf("%s.zip", dir)
-	if err := createZip(archiveFilename, func(w *zip.Writer) error {
-		for _, f := range fs {
-			if err := addFileToZip(w, f, ""); err != nil {
-				return err
-			}
-		}
-		f, err := w.Create(marFilePath)
-		if err != nil {
-			return err
-		}
-		manifestBytes, err := json.Marshal(m.Manifest())
-		if err != nil {
-			return err
-		}
-		_, err = f.Write(manifestBytes)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
+	store.AddReference(opts.Tag, *descs.Manifest)
+	if err := store.SaveIndex(); err != nil {
 		return err
 	}
-	return NewImport(a.cfg).Run(opts.Tag, archiveFilename, writer)
-}
 
-func copyFiles(m *TorchServeModelfile, dir string) ([]string, error) {
-	var files []string
-	mf, err := copyFile(m.ModelFile, dir)
-	if err != nil {
-		return files, err
-	}
-	files = append(files, mf)
-
-	sf, err := copyFile(m.SerializedFile, dir)
-	if err != nil {
-		return files, err
-	}
-	files = append(files, sf)
-
-	for _, f := range m.ExtraFiles {
-		ef, err := copyFile(f, dir)
-		if err != nil {
-			return files, err
-		}
-		files = append(files, ef)
-	}
-	if m.SourceVocab != "" {
-		sv, err := copyFile(m.SourceVocab, dir)
-		if err != nil {
-			return files, err
-		}
-		files = append(files, sv)
-	}
-	if m.IsCustomHandler() {
-		h, err := copyFile(m.Handler, dir)
-		if err != nil {
-			return files, err
-		}
-		files = append(files, h)
-	}
-	return files, nil
+	table := uitable.New()
+	table.Wrap = true
+	table.AddRow("Ref:", opts.Tag)
+	table.AddRow("Digest:", descs.Manifest.Digest.Hex())
+	table.AddRow("Model Digest:", descs.PyTorchModel.Digest.Hex())
+	table.AddRow("Size:",
+		byteCountBinary(descs.PyTorchModel.Size+descs.Content.Size))
+	table.AddRow()
+	_, err = writer.Write(table.Bytes())
+	return err
 }

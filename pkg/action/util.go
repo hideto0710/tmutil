@@ -17,12 +17,7 @@ limitations under the License.
 package action
 
 import (
-	"archive/zip"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/docker/go-units"
@@ -54,51 +49,4 @@ func shortDigest(digest string) string {
 // timeAgo returns a human-readable timestamp representing time that has passed
 func timeAgo(t time.Time) string {
 	return units.HumanDuration(time.Now().UTC().Sub(t))
-}
-
-func copyFile(src string, destDir string) (string, error) {
-	input, err := ioutil.ReadFile(src)
-	if err != nil {
-		return "", err
-	}
-	target := fmt.Sprintf("%s/%s", destDir, filepath.Base(src))
-	err = ioutil.WriteFile(target, input, 0644)
-	return target, err
-}
-
-func createZip(filename string, fn func(w *zip.Writer) error) error {
-	newZipFile, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer newZipFile.Close()
-	w := zip.NewWriter(newZipFile)
-	defer w.Close()
-	return fn(w)
-}
-
-func addFileToZip(w *zip.Writer, src string, dest string) error {
-	fileToZip, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer fileToZip.Close()
-	info, err := fileToZip.Stat()
-	if err != nil {
-		return err
-	}
-	header, err := zip.FileInfoHeader(info)
-	if err != nil {
-		return err
-	}
-	if dest != "" {
-		header.Name = dest
-	}
-	header.Method = zip.Deflate
-	writer, err := w.CreateHeader(header)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(writer, fileToZip)
-	return err
 }

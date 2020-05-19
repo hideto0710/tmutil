@@ -17,22 +17,26 @@ limitations under the License.
 package action
 
 import (
-	"archive/tar"
 	"archive/zip"
-	"bytes"
+	"context"
 	"encoding/json"
-	"fmt"
+	"go.uber.org/zap"
 	"io"
-	"io/ioutil"
-	"strconv"
 
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/gosuri/uitable"
 	"github.com/hideto0710/torchstand/pkg/types"
+	"github.com/hideto0710/torchstand/pkg/util"
 	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"go.uber.org/zap"
 )
+
+type BuiltDescriptor struct {
+	Config       *ocispec.Descriptor
+	Manifest     *ocispec.Descriptor
+	PyTorchModel *ocispec.Descriptor
+	Content      *ocispec.Descriptor
+}
 
 type Import struct {
 	cfg *Configuration
@@ -50,7 +54,6 @@ func NewImport(cfg *Configuration) *Import {
 
 func (p *Import) Run(argRef string, filePath string, writer io.Writer) error {
 	ctx := orascontext.Background()
-	logger := zap.L().Named("import")
 	store := p.cfg.OCIStore
 
 	zipReader, err := zip.OpenReader(filePath)
@@ -59,79 +62,20 @@ func (p *Import) Run(argRef string, filePath string, writer io.Writer) error {
 	}
 	defer zipReader.Close()
 
-	var torchServeManifest *types.Manifest
-	for _, f := range zipReader.File {
-		if f.Name == marFilePath {
-			rc, err := f.Open()
-			if err != nil {
-				return err
-			}
-			if err := json.NewDecoder(rc).Decode(&torchServeManifest); err != nil {
-				return err
-			}
-		}
-	}
-	if torchServeManifest == nil {
-		return fmt.Errorf("invalid TorchServe model archive, %s not found", marFilePath)
-	}
-	pytorchModelBytes, contentBytes, err := loadZip(zipReader.File, torchServeManifest.Model.SerializedFile)
+	bb, torchServeManifest, err := util.NewLoader().Load(zipReader)
 	if err != nil {
 		return err
 	}
 
-	// store config
-	configBytes, err := json.Marshal(torchServeManifest)
+	descs, err := storeAll(ctx, bb, torchServeManifest, p.cfg.StoreBlob)
 	if err != nil {
 		return err
 	}
-	configDesc, err := p.cfg.StoreBlob(ctx, "", TorchServeModelConfigMediaType, configBytes)
-	if err != nil {
-		return err
-	}
-	logger.Debug("stored",
-		zap.String("mediaType", configDesc.MediaType),
-		zap.String("digest", configDesc.Digest.String()))
-
-	// store pytorch model
-	pytorcchModelDesc, err := p.cfg.StoreBlob(ctx, torchServeManifest.Model.SerializedFile, PyTorchModelMediaType, pytorchModelBytes)
-	if err != nil {
-		return err
-	}
-	logger.Debug("stored",
-		zap.String("mediaType", pytorcchModelDesc.MediaType),
-		zap.String("digest", pytorcchModelDesc.Digest.String()))
-
-	// store content
-	contentDesc, err := p.cfg.StoreBlob(ctx, torchServeManifest.Model.ModelName, TorchServeModelContentLayerMediaType, contentBytes)
-	if err != nil {
-		return err
-	}
-	logger.Debug("stored",
-		zap.String("mediaType", contentDesc.MediaType),
-		zap.String("digest", contentDesc.Digest.String()))
-
-	// store manifest
-	manifest := ocispec.Manifest{
-		Versioned: specs.Versioned{SchemaVersion: 2},
-		Config:    *configDesc,
-		Layers:    []ocispec.Descriptor{*pytorcchModelDesc, *contentDesc},
-	}
-	manifestBytes, err := json.Marshal(manifest)
-	if err != nil {
-		return err
-	}
-	manifestDesc, err := p.cfg.StoreBlob(ctx, "", ocispec.MediaTypeImageManifest, manifestBytes)
-	if err != nil {
-		return err
-	}
-	logger.Debug("stored",
-		zap.String("mediaType", manifestDesc.MediaType),
-		zap.String("digest", manifestDesc.Digest.String()))
 
 	if err := store.LoadIndex(); err != nil {
 		return err
 	}
-	store.AddReference(argRef, *manifestDesc)
+	store.AddReference(argRef, *descs.Manifest)
 	if err := store.SaveIndex(); err != nil {
 		return err
 	}
@@ -139,61 +83,71 @@ func (p *Import) Run(argRef string, filePath string, writer io.Writer) error {
 	table := uitable.New()
 	table.Wrap = true
 	table.AddRow("Ref:", argRef)
-	table.AddRow("Digest:", manifestDesc.Digest.Hex())
-	table.AddRow("Model Digest:", pytorcchModelDesc.Digest.Hex())
+	table.AddRow("Digest:", descs.Manifest.Digest.Hex())
+	table.AddRow("Model Digest:", descs.PyTorchModel.Digest.Hex())
 	table.AddRow("Size:",
-		byteCountBinary(pytorcchModelDesc.Size+contentDesc.Size))
+		byteCountBinary(descs.PyTorchModel.Size+descs.Content.Size))
 	table.AddRow()
 	_, err = writer.Write(table.Bytes())
 	return err
 }
 
-func loadZip(files []*zip.File, modelFileName string) ([]byte, []byte, error) {
-	var contentBuffer bytes.Buffer
-	var pytorchModelBytes []byte
+func storeAll(
+	ctx context.Context,
+	builtBytes *util.BuiltBytes,
+	torchServeManifest *types.Manifest,
+	store func(ctx context.Context, name string, mediaType string, bytes []byte) (*ocispec.Descriptor, error),
+) (*BuiltDescriptor, error) {
 
-	// gzw := gzip.NewWriter(&contentBuffer)
-	// defer gzw.Close()
+	logger := zap.L().Named("store")
 
-	tw := tar.NewWriter(&contentBuffer)
-	defer tw.Close()
+	var err error
+	result := &BuiltDescriptor{}
 
-	for _, f := range files {
-		if f.Name == marFilePath {
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return nil, nil, err
-		}
-		fileBytes, err := ioutil.ReadAll(rc)
-		if f.Name == modelFileName {
-			pytorchModelBytes = fileBytes
-			if err := rc.Close(); err != nil {
-				return nil, nil, err
-			}
-			continue
-		}
-
-		info := f.FileInfo()
-		mode, err := strconv.ParseInt(fmt.Sprintf("%o", info.Mode().Perm()), 10, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		hdr := &tar.Header{
-			Name: info.Name(),
-			Mode: mode,
-			Size: info.Size(),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, nil, err
-		}
-		if _, err := tw.Write(fileBytes); err != nil {
-			return nil, nil, err
-		}
-		if err := rc.Close(); err != nil {
-			return nil, nil, err
-		}
+	// store config
+	result.Config, err = store(ctx, "", TorchServeModelConfigMediaType, builtBytes.Config)
+	if err != nil {
+		return nil, err
 	}
-	return pytorchModelBytes, contentBuffer.Bytes(), nil
+	logger.Debug("stored",
+		zap.String("mediaType", result.Config.MediaType),
+		zap.String("digest", result.Config.Digest.String()))
+
+	// store pytorch model
+	result.PyTorchModel, err = store(ctx, torchServeManifest.Model.SerializedFile, PyTorchModelMediaType, builtBytes.PyTorchModel)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("stored",
+		zap.String("mediaType", result.PyTorchModel.MediaType),
+		zap.String("digest", result.PyTorchModel.Digest.String()))
+
+	// store content
+	result.Content, err = store(ctx, torchServeManifest.Model.ModelName, TorchServeModelContentLayerMediaType, builtBytes.Contents)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("stored",
+		zap.String("mediaType", result.Content.MediaType),
+		zap.String("digest", result.Content.Digest.String()))
+
+	// store manifest
+	manifest := ocispec.Manifest{
+		Versioned: specs.Versioned{SchemaVersion: 2},
+		Config:    *result.Config,
+		Layers:    []ocispec.Descriptor{*result.PyTorchModel, *result.Content},
+	}
+	manifestBytes, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, err
+	}
+	result.Manifest, err = store(ctx, "", ocispec.MediaTypeImageManifest, manifestBytes)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("stored",
+		zap.String("mediaType", result.Manifest.MediaType),
+		zap.String("digest", result.Manifest.Digest.String()))
+
+	return result, nil
 }

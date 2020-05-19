@@ -59,10 +59,12 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 	var contentDesc ocispec.Descriptor
 	for _, layer := range layers {
 		switch layer.MediaType {
-		case PyTorchModelMediaType:
-			pytorchModelDesc = layer
+		case TorchServeModelConfigMediaType:
+			continue
 		case TorchServeModelContentLayerMediaType:
 			contentDesc = layer
+		case PyTorchModelMediaType:
+			pytorchModelDesc = layer
 		default:
 			return fmt.Errorf("unsupported mediaType %s", layer.MediaType)
 		}
@@ -80,7 +82,8 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 	table := uitable.New()
 	table.Wrap = true
 	table.AddRow("Ref:", ref)
-	table.AddRow("Digest:", desc.Digest)
+	table.AddRow("Digest:", desc.Digest.Hex())
+	table.AddRow("Model Digest:", pytorchModelInfo.Digest.Hex())
 	table.AddRow("Size:", byteCountBinary(pytorchModelInfo.Size+contentInfo.Size))
 	table.AddRow()
 	_, err = writer.Write(table.Bytes())

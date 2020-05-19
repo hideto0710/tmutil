@@ -33,6 +33,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/term"
 	"github.com/docker/go-connections/nat"
+	"github.com/hideto0710/torchstand/pkg/util"
 )
 
 const (
@@ -55,15 +56,19 @@ func NewRun(cfg *Configuration) *Run {
 	}
 }
 
-func (p *Run) Run(ref string, opts *RunOpts, writer io.Writer) error {
+func (p *Run) Run(argRef string, opts *RunOpts, writer io.Writer) error {
 	ctx := orascontext.Background()
 	store := p.cfg.OCIStore
 
 	if err := store.LoadIndex(); err != nil {
 		return err
 	}
-	r, err := p.cfg.FetchReference(ctx, ref)
+	ref, err := p.cfg.FetchReference(ctx, argRef)
 	if err != nil {
+		return err
+	}
+	if !ref.Exists {
+		_, err := fmt.Fprintf(writer, "Ref: %s not found\n", argRef)
 		return err
 	}
 
@@ -72,8 +77,8 @@ func (p *Run) Run(ref string, opts *RunOpts, writer io.Writer) error {
 		return err
 	}
 	defer os.RemoveAll(dir)
-	fullPath := fmt.Sprintf("%s/%s", dir, r.Digest.Hex())
-	if err := NewArchiver(r, p.cfg.Path.RegistryPath()).Archive(fullPath); err != nil {
+	fullPath := fmt.Sprintf("%s/%s", dir, ref.Digest.Hex())
+	if err := util.NewArchiver(ref, p.cfg.Path.RegistryPath()).Archive(fullPath); err != nil {
 		return err
 	}
 
@@ -95,7 +100,7 @@ func (p *Run) Run(ref string, opts *RunOpts, writer io.Writer) error {
 	if err != nil {
 		return err
 	}
-	containerName := shortDigest(r.Digest.Hex())
+	containerName := shortDigest(ref.Digest.Hex())
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:      torchserveImageName,
 		Entrypoint: []string{"torchserve"},
@@ -106,7 +111,7 @@ func (p *Run) Run(ref string, opts *RunOpts, writer io.Writer) error {
 			"--model-store",
 			"/home/model-server/model-store",
 			"--models",
-			r.Digest.Hex(),
+			ref.Digest.Hex(),
 			"--foreground",
 		},
 	}, &container.HostConfig{

@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package action
+package util
 
 import (
 	"archive/tar"
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,6 +28,13 @@ import (
 	torchstandTypes "github.com/hideto0710/torchstand/pkg/types"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+const (
+	ManifestFileName = "MANIFEST.json"
+	MarInf           = "MAR-INF"
+)
+
+var MarFilePath = fmt.Sprintf("%s/%s", MarInf, ManifestFileName)
 
 type Archiver struct {
 	ref          *torchstandTypes.Ref
@@ -61,7 +69,7 @@ func (a *Archiver) Archive(dest string) error {
 }
 
 func (a *Archiver) copyConfig(w *zip.Writer) error {
-	return addFileToZip(w, a.blobPath(a.ref.Config), marFilePath)
+	return addFileToZip(w, a.blobPath(a.ref.Config), MarFilePath)
 }
 
 func (a *Archiver) copyPyTorchModel(w *zip.Writer) error {
@@ -111,4 +119,30 @@ func (a *Archiver) copyContents(w *zip.Writer) error {
 
 func (a *Archiver) blobPath(desc v1.Descriptor) string {
 	return filepath.Join(a.registryPath, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Hex())
+}
+
+func addFileToZip(w *zip.Writer, src string, dest string) error {
+	fileToZip, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer fileToZip.Close()
+	info, err := fileToZip.Stat()
+	if err != nil {
+		return err
+	}
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return err
+	}
+	if dest != "" {
+		header.Name = dest
+	}
+	header.Method = zip.Deflate
+	writer, err := w.CreateHeader(header)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(writer, fileToZip)
+	return err
 }
