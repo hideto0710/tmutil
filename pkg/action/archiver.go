@@ -1,8 +1,25 @@
+/*
+Copyright © 2020 HIDETO INAMURA <h.inamura0710@gmail.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package action
 
 import (
 	"archive/tar"
 	"archive/zip"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -48,8 +65,15 @@ func (a *Archiver) copyConfig(w *zip.Writer) error {
 }
 
 func (a *Archiver) copyPyTorchModel(w *zip.Writer) error {
-	// TODO: read config.json
-	return addFileToZip(w, a.blobPath(a.ref.PyTorchModel), "densenet161-8d451a50.pth")
+	configFile, err := os.Open(a.blobPath(a.ref.Config))
+	if err != nil {
+		return err
+	}
+	m := &torchstandTypes.Manifest{}
+	if err := json.NewDecoder(configFile).Decode(&m); err != nil {
+		return err
+	}
+	return addFileToZip(w, a.blobPath(a.ref.PyTorchModel), m.Model.SerializedFile)
 }
 
 func (a *Archiver) copyContents(w *zip.Writer) error {
