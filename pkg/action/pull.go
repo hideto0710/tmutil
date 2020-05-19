@@ -18,11 +18,12 @@ package action
 
 import (
 	"fmt"
+	"io"
+
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/deislabs/oras/pkg/oras"
 	"github.com/gosuri/uitable"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"io"
 )
 
 type Pull struct {
