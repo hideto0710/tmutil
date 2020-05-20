@@ -1,0 +1,7 @@
+modelName: densenet161
+version: 1.0
+modelFile: ./densenet161/model.py
+serializedFile: ./densenet161/densenet161.pth
+extraFiles:
+  - ./densenet161/index_to_name.json
+handler: image_classifier

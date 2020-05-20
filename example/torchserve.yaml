@@ -1,0 +1,7 @@
+modelName: densenet161
+version: 1.0
+modelFile: ./pkg/testdata/build/model.py
+serializedFile: ./example/densenet161-8d451a50.pth
+extraFiles:
+  - ./pkg/testdata/build/index_to_name.json
+handler: image_classifier
