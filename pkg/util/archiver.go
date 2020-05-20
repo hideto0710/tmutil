@@ -64,7 +64,7 @@ func (a *Archiver) Archive(writer io.Writer) error {
 }
 
 func (a *Archiver) copyConfig(w *zip.Writer) error {
-	return addFileToZip(w, a.blobPath(a.ref.Config), MarFilePath)
+	return addToZip(w, a.blobPath(a.ref.Config), MarFilePath)
 }
 
 func (a *Archiver) copyPyTorchModel(w *zip.Writer) error {
@@ -76,7 +76,7 @@ func (a *Archiver) copyPyTorchModel(w *zip.Writer) error {
 	if err := json.NewDecoder(configFile).Decode(&m); err != nil {
 		return err
 	}
-	return addFileToZip(w, a.blobPath(a.ref.PyTorchModel), m.Model.SerializedFile)
+	return addToZip(w, a.blobPath(a.ref.PyTorchModel), m.Model.SerializedFile)
 }
 
 func (a *Archiver) copyContents(w *zip.Writer) error {
@@ -116,7 +116,7 @@ func (a *Archiver) blobPath(desc v1.Descriptor) string {
 	return filepath.Join(a.registryPath, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Hex())
 }
 
-func addFileToZip(w *zip.Writer, src string, dest string) error {
+func addToZip(w *zip.Writer, src string, dest string) error {
 	fileToZip, err := os.Open(src)
 	if err != nil {
 		return err

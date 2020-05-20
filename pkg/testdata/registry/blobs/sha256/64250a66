@@ -1,0 +1,1 @@
+{"runtime":"python","model":{"modelName":"densenet161","serializedFile":"densenet161.pth","handler":"image_classifier","modelFile":"model.py","modelVersion":"1.1"},"modelServerVersion":"1.0","implementationVersion":"1.0","specificationVersion":"1.0"}

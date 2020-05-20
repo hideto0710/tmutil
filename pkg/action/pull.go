@@ -23,6 +23,7 @@ import (
 	orascontext "github.com/deislabs/oras/pkg/context"
 	"github.com/deislabs/oras/pkg/oras"
 	"github.com/gosuri/uitable"
+	"github.com/hideto0710/torchstand/pkg/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -42,7 +43,7 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 
 	pullOpts := []oras.PullOpt{
 		oras.WithContentProvideIngester(store),
-		oras.WithAllowedMediaTypes(KnownMediaTypes()),
+		oras.WithAllowedMediaTypes(types.KnownMediaTypes()),
 		oras.WithPullEmptyNameAllowed(),
 	}
 	// TODO: print progress.
@@ -60,11 +61,11 @@ func (p *Pull) Run(ref string, writer io.Writer) error {
 	var contentDesc ocispec.Descriptor
 	for _, layer := range layers {
 		switch layer.MediaType {
-		case TorchServeModelConfigMediaType:
+		case types.TorchServeModelConfigMediaType:
 			continue
-		case TorchServeModelContentLayerMediaType:
+		case types.TorchServeModelContentLayerMediaType:
 			contentDesc = layer
-		case PyTorchModelMediaType:
+		case types.PyTorchModelMediaType:
 			pytorchModelDesc = layer
 		default:
 			return fmt.Errorf("unsupported mediaType %s", layer.MediaType)

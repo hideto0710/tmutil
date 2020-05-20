@@ -63,29 +63,29 @@ func (b *Builder) buildContents() ([]byte, error) {
 	var contentBuffer bytes.Buffer
 	tw := tar.NewWriter(&contentBuffer)
 	defer tw.Close()
-	if err := writeToTar(b.modelFile.ModelFile, tw); err != nil {
+	if err := addToTar(tw, b.modelFile.ModelFile); err != nil {
 		return nil, err
 	}
 	for _, name := range b.modelFile.ExtraFiles {
-		if err := writeToTar(name, tw); err != nil {
+		if err := addToTar(tw, name); err != nil {
 			return nil, err
 		}
 	}
 	if b.modelFile.SourceVocab != "" {
-		if err := writeToTar(b.modelFile.SourceVocab, tw); err != nil {
+		if err := addToTar(tw, b.modelFile.SourceVocab); err != nil {
 			return nil, err
 		}
 	}
 	if b.modelFile.IsCustomHandler() {
-		if err := writeToTar(b.modelFile.Handler, tw); err != nil {
+		if err := addToTar(tw, b.modelFile.Handler); err != nil {
 			return nil, err
 		}
 	}
 	return contentBuffer.Bytes(), nil
 }
 
-func writeToTar(filename string, writer *tar.Writer) error {
-	f, err := os.Open(filename)
+func addToTar(w *tar.Writer, src string) error {
+	f, err := os.Open(src)
 	if err != nil {
 		return err
 	}
@@ -101,16 +101,15 @@ func writeToTar(filename string, writer *tar.Writer) error {
 	if err != nil {
 		return err
 	}
-	// FIXME: ignore tree structure, may overwritten.
 	hdr := &tar.Header{
 		Name: info.Name(),
 		Mode: mode,
 		Size: info.Size(),
 	}
-	if err := writer.WriteHeader(hdr); err != nil {
+	if err := w.WriteHeader(hdr); err != nil {
 		return err
 	}
-	if _, err := writer.Write(fileBytes); err != nil {
+	if _, err := w.Write(fileBytes); err != nil {
 		return err
 	}
 	return nil

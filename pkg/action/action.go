@@ -116,19 +116,19 @@ func (cfg *Configuration) SummarizeModel(ctx context.Context, ref string, manife
 	var contentDesc ocispec.Descriptor
 	for _, layer := range manifest.Layers {
 		switch layer.MediaType {
-		case PyTorchModelMediaType:
+		case types.PyTorchModelMediaType:
 			pytorchModelDesc = layer
-		case TorchServeModelContentLayerMediaType:
+		case types.TorchServeModelContentLayerMediaType:
 			contentDesc = layer
 		default:
 			return result, fmt.Errorf("unsupported mediaType %s", layer.MediaType)
 		}
 	}
 	if pytorchModelDesc.Size == 0 {
-		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", PyTorchModelMediaType)
+		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", types.PyTorchModelMediaType)
 	}
 	if contentDesc.Size == 0 {
-		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", TorchServeModelContentLayerMediaType)
+		return result, fmt.Errorf("manifest layer with mediatype %s is of size 0", types.TorchServeModelContentLayerMediaType)
 	}
 
 	result.PyTorchModel = pytorchModelDesc

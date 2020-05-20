@@ -105,7 +105,7 @@ func storeAll(
 	result := &BuiltDescriptor{}
 
 	// store config
-	result.Config, err = store(ctx, "", TorchServeModelConfigMediaType, builtBytes.Config)
+	result.Config, err = store(ctx, "", types.TorchServeModelConfigMediaType, builtBytes.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func storeAll(
 		zap.String("digest", result.Config.Digest.String()))
 
 	// store pytorch model
-	result.PyTorchModel, err = store(ctx, torchServeManifest.Model.SerializedFile, PyTorchModelMediaType, builtBytes.PyTorchModel)
+	result.PyTorchModel, err = store(ctx, torchServeManifest.Model.SerializedFile, types.PyTorchModelMediaType, builtBytes.PyTorchModel)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func storeAll(
 		zap.String("digest", result.PyTorchModel.Digest.String()))
 
 	// store content
-	result.Content, err = store(ctx, torchServeManifest.Model.ModelName, TorchServeModelContentLayerMediaType, builtBytes.Contents)
+	result.Content, err = store(ctx, torchServeManifest.Model.ModelName, types.TorchServeModelContentLayerMediaType, builtBytes.Contents)
 	if err != nil {
 		return nil, err
 	}
